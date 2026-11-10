@@ -61,6 +61,9 @@ Phone page (HTTPS) <-> wss://<laptop-ip>:8443/ws <-> server.py
 | parking | `space` | tap |
 | engine | `e` | tap |
 | cruise | `c` | tap |
+| trailer | `t` | tap (attach/detach) |
+| enter | `enter` | tap (tolls, job menu, confirm) |
+| pause | `esc` | tap (opens the ETS2 pause menu) |
 
 - Key names are pydirectinput names. Unknown names fail silently.
 - Every button press is logged in the server console as `[btn] <id> down -> key '<k>' (<mode>)`. If that line appears but nothing happens in-game, it is a focus/admin/keybind issue; if it does not appear, the phone page is stale.
@@ -75,7 +78,7 @@ Phone page (HTTPS) <-> wss://<laptop-ip>:8443/ws <-> server.py
 - Safety: pedals, steering and buttons are zeroed/released on disconnect or when the page is hidden.
 - Layout (landscape, three columns):
   - Left: Brake pedal.
-  - Centre: steering readout and bar; quick row `Left | Horn | Right`; `Calibrate` and `More`. `More` opens a panel over the centre with two tabs: **Buttons** (Hazards, Lights, High beam, Wipers, Parking brake, Engine) and **Settings** (Flip direction, Sensitivity, Deadzone fix).
+  - Centre: steering readout and bar; quick row `Left | Horn | Enter | Right`; bottom row `Calibrate | Pause | More` (Pause = Esc, centred). `More` opens a panel over the centre with two tabs: **Buttons** (Hazards, Lights, High beam, Wipers, Parking brake, Engine, Trailer; 4-column grid, Trailer spans two cells) and **Settings** (Flip direction, Sensitivity, Deadzone fix).
   - Right: **Cruise** button on top, Throttle pedal below (so cruise can be toggled with the throttle thumb).
 - Buttons highlight only while touched; the page does not know the truck's real state (lights, hazards, cruise are toggles in the game).
 
@@ -88,13 +91,13 @@ Phone page (HTTPS) <-> wss://<laptop-ip>:8443/ws <-> server.py
 - **Wipers:** ETS2 has two mappings, "Wipers" and "Wipers Back". The default P press should cycle off > 1 > 2 > 3 > off, but on this setup the 4th press did not turn them off. Check Options > Controls > Keyboard for a "Wipers Back" binding: either unassign it (then P alone should cycle through off), or add its key to KEYMAP as an extra button (see next steps).
 
 ## Status
-Working and tested in ETS2: connection status, tilt steering, throttle, brake, and the keyboard buttons (indicators, hazards, lights, high beam, horn, parking brake, engine) with both PowerShell and ETS2 as Administrator. Wipers cycle 1 to 3 but the 4th press does not switch them off yet (see Gotchas). The Cruise button was added last and is untested.
+Working and tested in ETS2: connection status, tilt steering, throttle, brake, and the keyboard buttons (indicators, hazards, lights, high beam, horn, parking brake, engine) with both PowerShell and ETS2 as Administrator. Wipers cycle 1 to 3 but the 4th press does not switch them off yet (see Gotchas). Cruise, Trailer, Enter and Pause buttons were added last and are untested. Occasional ~2 s WiFi drops happen while driving; accepted for now (ideas: both devices on 5 GHz, USB tethering/hotspot, faster reconnect + pong watchdog; Bluetooth would need a native Android app).
 
 ## What more we can do
 1. Fix the wipers-off behaviour: unassign "Wipers Back" in ETS2, or add a `wipers_off` button/key to KEYMAP (and a matching button in the More panel).
 2. Double-click launcher (.bat) that starts the server as Administrator: activate the venv, run `python server.py`, and request elevation (e.g. via `powershell Start-Process ... -Verb RunAs`).
 3. Live telemetry on the phone (speed, gear, cruise state, lights, wipers level, hazards) with an ETS2 telemetry plugin (e.g. ets2-telemetry-server). This would also let the buttons show the real state instead of just flashing, and fix toggle desync.
-4. More buttons: cruise speed +/- (cruise increase/decrease keys), engine brake / retarder up and down, beacon, trailer attach/detach, gear shift hints, camera switch (1 to 6), GPS/route advisor, pause.
+4. More buttons: cruise speed +/- (cruise increase/decrease keys), engine brake / retarder up and down, beacon, gear shift hints, camera switch (1 to 6), GPS/route advisor.
 5. Customisable layout: let the phone choose which buttons sit in the quick row; remember the choice in localStorage.
 6. Haptics: `navigator.vibrate` on button press (Android Chrome supports it).
 7. Light security: any device on the WiFi that opens the page can drive. Add a short PIN or token in the QR code URL checked on the WebSocket.

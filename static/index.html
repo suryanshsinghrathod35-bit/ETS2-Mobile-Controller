@@ -38,6 +38,8 @@
   button.act { flex:1; padding:12px 6px; border-radius:10px; border:1px solid var(--line); background:var(--road);
                color:var(--text); font-size:.9rem; font-weight:600; touch-action:none; }
   button.act.on { background:var(--amber); color:#111; border-color:var(--amber); }
+  #pauseBtn { flex:1; }
+  #moreBtns .wide { grid-column: span 2; }
   #rightCol { display:flex; flex-direction:column; gap:10px; min-height:0; }
   #rightCol .pedal { flex:1; min-height:0; }
   #cruiseBtn { flex:0 0 auto; padding:14px 6px; font-size:1rem; }
@@ -46,7 +48,7 @@
   #moreTabs { display:flex; gap:8px; }
   #moreTabs .btn { padding:7px; }
   #moreTabs .btn.sel { background:var(--line); }
-  #moreBtns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; flex:1; }
+  #moreBtns { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; flex:1; }
   #moreSettings { display:none; flex-direction:column; gap:12px; justify-content:center; flex:1; }
   input[type=range] { flex:1; accent-color:var(--amber); touch-action:none; }
   .overlay { display:none; position:fixed; inset:0; background:var(--road); align-items:center; justify-content:center;
@@ -77,9 +79,14 @@
       <div class="row">
         <button class="act" data-btn="left">&#9664; Left</button>
         <button class="act" data-btn="horn">Horn</button>
+        <button class="act" data-btn="enter">Enter</button>
         <button class="act" data-btn="right">Right &#9654;</button>
       </div>
-      <div class="row"><button class="btn" id="calib">Calibrate</button><button class="btn" id="moreOpen">More</button></div>
+      <div class="row">
+        <button class="btn" id="calib" style="flex:1">Calibrate</button>
+        <button class="act" id="pauseBtn" data-btn="pause">Pause</button>
+        <button class="btn" id="moreOpen" style="flex:1">More</button>
+      </div>
 
       <div id="more">
         <div id="moreTabs">
@@ -94,6 +101,7 @@
           <button class="act" data-btn="wipers">Wipers</button>
           <button class="act" data-btn="parking">Parking brake</button>
           <button class="act" data-btn="engine">Engine</button>
+          <button class="act wide" data-btn="trailer">Trailer</button>
         </div>
         <div id="moreSettings">
           <div class="row"><button class="btn" id="flip">Flip direction</button></div>

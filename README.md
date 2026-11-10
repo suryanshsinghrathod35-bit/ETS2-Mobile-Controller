@@ -11,7 +11,7 @@ Use your Android phone as a wireless controller for **Euro Truck Simulator 2** o
 
 - **Tilt steering:** hold the phone like a wheel; adjustable sensitivity, flip direction, one-tap calibration
 - **Hold-to-press pedals:** throttle and brake with smooth ramping
-- **Buttons:** left/right indicator, horn, hazards, lights, high beam, wipers, parking brake, engine, cruise control
+- **Buttons:** left/right indicator, horn, hazards, lights, high beam, wipers, parking brake, engine, cruise control, trailer attach/detach, Enter, pause
 - **Connection status** on the phone, with live latency
 - **Works on 2.4 GHz or 5 GHz WiFi:** the server auto-detects your laptop's IP (or you can pass one)
 - **Safe by default:** if the phone disconnects, the page is hidden or fullscreen is left, steering, pedals and held keys are released
@@ -87,13 +87,16 @@ The buttons send keyboard keys, so keep the default ETS2 keyboard bindings, or e
 | Parking brake | `Space` | tap |
 | Engine | `E` | tap |
 | Cruise control | `C` | tap |
+| Attach / detach trailer | `T` | tap |
+| Enter (tolls, job menu, confirm) | `Enter` | tap |
+| Pause menu | `Esc` | tap |
 
 Check your own bindings under **Options > Controls > Keyboard** and change the table in `server.py` if any differ. Key names are [pydirectinput](https://github.com/learncodebygaming/pydirectinput) names (`"["`, `"f"`, `"space"`, ...). Restart the server after editing it.
 
 ## Phone controls
 
-- **Centre panel:** steering readout, quick row (Left, Horn, Right), Calibrate, and **More**
-- **More > Buttons:** Hazards, Lights, High beam, Wipers, Parking brake, Engine
+- **Centre panel:** steering readout, quick row (Left, Horn, Enter, Right), and a bottom row with Calibrate, **Pause** (Esc) and **More**
+- **More > Buttons:** Hazards, Lights, High beam, Wipers, Parking brake, Engine, Trailer
 - **More > Settings:** Flip direction, Sensitivity (degrees for full lock), Deadzone fix
 - **Right side:** Cruise button above the Throttle pedal
 - **Left side:** Brake pedal
@@ -133,7 +136,7 @@ HANDOFF.md           developer notes and next steps
 ## Roadmap
 
 - Live telemetry on the phone (speed, gear, real state of lights, wipers and cruise)
-- Cruise speed up/down, retarder, beacon, trailer and camera buttons
+- Cruise speed up/down, retarder, beacon and camera buttons
 - Customisable quick-button row
 - Vibration feedback on press
 - PIN/token for the connection

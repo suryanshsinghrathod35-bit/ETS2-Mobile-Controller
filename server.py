@@ -12,6 +12,7 @@ import ssl
 import sys
 from pathlib import Path
 
+import pydirectinput
 import qrcode
 import vgamepad as vg
 from cryptography import x509
@@ -30,8 +31,59 @@ BASE = Path(__file__).parent
 PAGE = BASE / "static" / "index.html"
 CERT_DIR = BASE / "certs"
 
+pydirectinput.PAUSE = 0          # no built-in delay after each key call
+pydirectinput.FAILSAFE = False   # don't abort when the mouse hits a screen corner
+
 pad = None  # virtual Xbox 360 controller, created in main()
 state = {"steer": 0.0, "throttle": 0.0, "brake": 0.0}
+
+# Phone button id -> (keyboard key, mode)
+#   "tap"  = quick press-and-release on touch (toggles: lights, indicators, ...)
+#   "hold" = key stays down while the button is held (horn)
+# These are ETS2's usual default keys. Check them against Options > Controls >
+# Keyboard in the game and edit any that differ. Key names are pydirectinput's
+# (e.g. "[", "]", "f7", "space", "e").
+KEYMAP = {
+    "left":     ("[",     "tap"),
+    "right":    ("]",     "tap"),
+    "hazard":   ("f",     "tap"),
+    "lights":   ("l",     "tap"),
+    "highbeam": ("k",     "tap"),
+    "horn":     ("h",     "hold"),
+    "wipers":   ("p",     "tap"),
+    "parking":  ("space", "tap"),
+    "engine":   ("e",     "tap"),
+    "cruise":   ("c",     "tap"),
+}
+held_keys = set()  # keys currently held down by "hold" buttons
+
+
+async def handle_button(btn_id, down):
+    """Translate a phone button event into a real key press for ETS2."""
+    entry = KEYMAP.get(btn_id)
+    if entry is None:
+        print(f"\n   [btn] unknown button id: {btn_id!r}")
+        return
+    key, mode = entry
+    if down or mode == "hold":
+        print(f"\n   [btn] {btn_id} {'down' if down else 'up'} -> key {key!r} ({mode})")
+    if mode == "hold":
+        if down and key not in held_keys:
+            held_keys.add(key)
+            pydirectinput.keyDown(key)
+        elif not down and key in held_keys:
+            held_keys.discard(key)
+            pydirectinput.keyUp(key)
+    elif down:  # tap: act on touch-down only
+        pydirectinput.keyDown(key)
+        await asyncio.sleep(0.12)  # long enough for the game to see it at low FPS
+        pydirectinput.keyUp(key)
+
+
+def release_all_keys():
+    for key in list(held_keys):
+        pydirectinput.keyUp(key)
+    held_keys.clear()
 
 
 def apply_state():
@@ -143,6 +195,11 @@ async def handler(ws):
                 elif kind == "brake":
                     state["brake"] = max(0.0, min(1.0, float(msg.get("v", 0))))
                     apply_state()
+                elif kind == "btn":
+                    try:
+                        await handle_button(str(msg.get("id")), bool(msg.get("down")))
+                    except Exception as e:  # never drop the phone because of a key error
+                        print(f"\n   [btn] key press failed: {e!r}")
                 elif kind == "lat":
                     print(f"\r   latency: {msg.get('ms')} ms   ", end="", flush=True)
             except (ValueError, TypeError):
@@ -152,6 +209,7 @@ async def handler(ws):
     finally:
         # Safety: never leave the truck steering/accelerating after a drop.
         state.update(steer=0.0, throttle=0.0, brake=0.0)
+        release_all_keys()
         pad.reset()
         pad.update()
         print(f"\n❌ Phone disconnected ({addr})")

@@ -1,0 +1,5 @@
+vgamepad
+websockets
+qrcode
+pydirectinput
+cryptography

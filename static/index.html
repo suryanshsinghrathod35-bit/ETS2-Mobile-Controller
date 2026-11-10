@@ -35,6 +35,19 @@
   button.btn { flex:1; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--road);
                color:var(--text); font-size:.9rem; }
   button.btn:active { background:var(--line); }
+  button.act { flex:1; padding:12px 6px; border-radius:10px; border:1px solid var(--line); background:var(--road);
+               color:var(--text); font-size:.9rem; font-weight:600; touch-action:none; }
+  button.act.on { background:var(--amber); color:#111; border-color:var(--amber); }
+  #rightCol { display:flex; flex-direction:column; gap:10px; min-height:0; }
+  #rightCol .pedal { flex:1; min-height:0; }
+  #cruiseBtn { flex:0 0 auto; padding:14px 6px; font-size:1rem; }
+  #more { display:none; position:absolute; inset:0; z-index:5; background:var(--panel); flex-direction:column; gap:10px; padding:10px 14px; }
+  #more.open { display:flex; }
+  #moreTabs { display:flex; gap:8px; }
+  #moreTabs .btn { padding:7px; }
+  #moreTabs .btn.sel { background:var(--line); }
+  #moreBtns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; flex:1; }
+  #moreSettings { display:none; flex-direction:column; gap:12px; justify-content:center; flex:1; }
   input[type=range] { flex:1; accent-color:var(--amber); touch-action:none; }
   .overlay { display:none; position:fixed; inset:0; background:var(--road); align-items:center; justify-content:center;
              flex-direction:column; gap:18px; text-align:center; padding:24px; font-size:1.1rem; }
@@ -61,12 +74,39 @@
     <div class="zone" id="center">
       <div><div class="label">Steering (tilt)</div><div id="value">0</div></div>
       <div id="track"><div id="mid"></div><div id="mark"></div></div>
-      <div class="row"><button class="btn" id="calib">Calibrate</button><button class="btn" id="flip">Flip direction</button></div>
-      <div class="row"><span class="label">Sensitivity</span><input id="lock" type="range" min="25" max="90" value="45"><span class="label" id="lockVal">45°</span></div>
-      <div class="row"><span class="label">Deadzone fix</span><input id="dz" type="range" min="0" max="35" value="24"><span class="label" id="dzVal">24%</span></div>
+      <div class="row">
+        <button class="act" data-btn="left">&#9664; Left</button>
+        <button class="act" data-btn="horn">Horn</button>
+        <button class="act" data-btn="right">Right &#9654;</button>
+      </div>
+      <div class="row"><button class="btn" id="calib">Calibrate</button><button class="btn" id="moreOpen">More</button></div>
+
+      <div id="more">
+        <div id="moreTabs">
+          <button class="btn sel" id="tabBtns">Buttons</button>
+          <button class="btn" id="tabSet">Settings</button>
+          <button class="btn" id="moreClose" style="flex:0 0 52px">&#10005;</button>
+        </div>
+        <div id="moreBtns">
+          <button class="act" data-btn="hazard">Hazards</button>
+          <button class="act" data-btn="lights">Lights</button>
+          <button class="act" data-btn="highbeam">High beam</button>
+          <button class="act" data-btn="wipers">Wipers</button>
+          <button class="act" data-btn="parking">Parking brake</button>
+          <button class="act" data-btn="engine">Engine</button>
+        </div>
+        <div id="moreSettings">
+          <div class="row"><button class="btn" id="flip">Flip direction</button></div>
+          <div class="row"><span class="label">Sensitivity</span><input id="lock" type="range" min="25" max="90" value="45"><span class="label" id="lockVal">45&deg;</span></div>
+          <div class="row"><span class="label">Deadzone fix</span><input id="dz" type="range" min="0" max="35" value="24"><span class="label" id="dzVal">24%</span></div>
+        </div>
+      </div>
     </div>
 
-    <div class="zone pedal" id="throttle"><div class="fill"></div><div class="name">Throttle</div></div>
+    <div id="rightCol">
+      <button class="act" id="cruiseBtn" data-btn="cruise">Cruise</button>
+      <div class="zone pedal" id="throttle"><div class="fill"></div><div class="name">Throttle</div></div>
+    </div>
   </div>
 
 <script>
@@ -157,11 +197,40 @@
   }
   requestAnimationFrame(loop);
 
+  /* ---------- Buttons (indicators, lights, horn, ...) ---------- */
+  const pressed = new Set();
+  document.querySelectorAll("button.act").forEach((b) => {
+    const id = b.dataset.btn;
+    b.addEventListener("pointerdown", (e) => {
+      b.setPointerCapture(e.pointerId); b.classList.add("on"); pressed.add(id);
+      send({ t: "btn", id, down: true });
+    });
+    const up = () => {
+      if (!pressed.has(id)) return;
+      pressed.delete(id); b.classList.remove("on"); send({ t: "btn", id, down: false });
+    };
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((n) => b.addEventListener(n, up));
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+  });
+  const more = $("more");
+  function showTab(buttons) {
+    $("moreBtns").style.display = buttons ? "grid" : "none";
+    $("moreSettings").style.display = buttons ? "none" : "flex";
+    $("tabBtns").classList.toggle("sel", buttons); $("tabSet").classList.toggle("sel", !buttons);
+  }
+  $("moreOpen").addEventListener("click", () => { showTab(true); more.classList.add("open"); });
+  $("moreClose").addEventListener("click", () => more.classList.remove("open"));
+  $("tabBtns").addEventListener("click", () => showTab(true));
+  $("tabSet").addEventListener("click", () => showTab(false));
+
   function resetControls() {
     for (const p of Object.values(pedals)) { p.target = 0; p.value = 0; p.fill.style.transform = "scaleY(0)"; }
     lastSent = 0; $("value").textContent = "0"; $("mark").style.left = "50%";
+    document.querySelectorAll("button.act.on").forEach((b) => b.classList.remove("on"));
   }
   function releaseAndTell() {
+    for (const id of pressed) send({ t: "btn", id, down: false });
+    pressed.clear();
     resetControls(); send({ t: "throttle", v: 0 }); send({ t: "brake", v: 0 }); send({ t: "steer", v: 0 });
   }
 

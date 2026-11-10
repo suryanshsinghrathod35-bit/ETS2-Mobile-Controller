@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ETS2 Controller</title>
+<style>
+  :root { --road:#14171a; --panel:#1e2327; --line:#333b41; --text:#e8eaec; --muted:#8b959c;
+          --amber:#ffb000; --ok:#3ddc84; --warn:#ffb000; --bad:#ff5a4f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; overflow:hidden; }
+  body { background:var(--road); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         display:flex; flex-direction:column; padding:8px 28px; gap:8px;
+         user-select:none; -webkit-user-select:none; touch-action:none; }
+  header { display:flex; align-items:center; justify-content:space-between; }
+  h1 { font-size:.95rem; font-weight:600; margin:0; }
+  #status { display:flex; align-items:center; gap:8px; padding:5px 12px; border:1px solid var(--line);
+            border-radius:999px; background:var(--panel); font-size:.85rem; }
+  #dot { width:10px; height:10px; border-radius:50%; background:var(--warn); }
+  #status.ok #dot { background:var(--ok); } #status.down #dot { background:var(--bad); }
+  #deck { flex:1; min-height:0; display:grid; grid-template-columns:3fr 4fr 3fr; gap:10px; transition:opacity .2s; }
+  #deck.off { opacity:.35; pointer-events:none; }
+  .zone { background:var(--panel); border:1px solid var(--line); border-radius:14px; position:relative; overflow:hidden; }
+  .pedal .fill { position:absolute; inset:0; transform-origin:bottom; transform:scaleY(0); opacity:.55; }
+  #throttle .fill { background:var(--ok); } #brake .fill { background:var(--bad); }
+  .pedal .name { position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center;
+                 font-weight:600; font-size:1.1rem; pointer-events:none; }
+  #center { display:flex; flex-direction:column; justify-content:center; gap:12px; padding:12px 16px; }
+  .label { color:var(--muted); font-size:.8rem; }
+  #value { font-size:2.2rem; font-weight:700; color:var(--amber); font-variant-numeric:tabular-nums; }
+  #track { height:14px; border-radius:7px; background:var(--road); border:1px solid var(--line); position:relative; }
+  #mid { position:absolute; left:50%; top:-3px; bottom:-3px; width:2px; background:var(--muted); }
+  #mark { position:absolute; top:-3px; bottom:-3px; width:12px; margin-left:-6px; left:50%; border-radius:4px; background:var(--amber); }
+  .row { display:flex; gap:8px; align-items:center; }
+  button.btn { flex:1; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--road);
+               color:var(--text); font-size:.9rem; }
+  button.btn:active { background:var(--line); }
+  input[type=range] { flex:1; accent-color:var(--amber); touch-action:none; }
+  .overlay { display:none; position:fixed; inset:0; background:var(--road); align-items:center; justify-content:center;
+             flex-direction:column; gap:18px; text-align:center; padding:24px; font-size:1.1rem; }
+  #rotate { z-index:10; } @media (orientation:portrait) { #rotate { display:flex; } }
+  #start { z-index:20; display:flex; }
+  #startBtn { padding:16px 40px; font-size:1.2rem; font-weight:700; border-radius:12px; border:0; background:var(--amber); color:#111; }
+</style>
+</head>
+<body>
+  <div id="rotate" class="overlay">Turn your phone sideways to drive.</div>
+  <div id="start" class="overlay">
+    <div>Turn your phone sideways and hold it like a steering wheel,<br>then tap Start.</div>
+    <button id="startBtn">Start driving</button>
+  </div>
+
+  <header>
+    <h1>ETS2 Controller</h1>
+    <div id="status" class="down"><span id="dot"></span><span id="statusText">Disconnected</span></div>
+  </header>
+
+  <div id="deck" class="off">
+    <div class="zone pedal" id="brake"><div class="fill"></div><div class="name">Brake</div></div>
+
+    <div class="zone" id="center">
+      <div><div class="label">Steering (tilt)</div><div id="value">0</div></div>
+      <div id="track"><div id="mid"></div><div id="mark"></div></div>
+      <div class="row"><button class="btn" id="calib">Calibrate</button><button class="btn" id="flip">Flip direction</button></div>
+      <div class="row"><span class="label">Sensitivity</span><input id="lock" type="range" min="25" max="90" value="45"><span class="label" id="lockVal">45°</span></div>
+      <div class="row"><span class="label">Deadzone fix</span><input id="dz" type="range" min="0" max="35" value="24"><span class="label" id="dzVal">24%</span></div>
+    </div>
+
+    <div class="zone pedal" id="throttle"><div class="fill"></div><div class="name">Throttle</div></div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status"), statusText = $("statusText"), deck = $("deck");
+  let ws = null, pingTimer = null, reconnectTimer = null;
+
+  function setStatus(s, t) { statusEl.className = s; statusText.textContent = t; }
+  function send(o) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+
+  function connect() {
+    clearTimeout(reconnectTimer);
+    setStatus("connecting", "Connecting...");
+    ws = new WebSocket("wss://" + location.host + "/ws");
+    ws.onmessage = (e) => {
+      const m = JSON.parse(e.data);
+      if (m.t === "hello") {
+        setStatus("ok", "Connected"); deck.classList.remove("off");
+        clearInterval(pingTimer);
+        pingTimer = setInterval(() => send({ t: "ping", ts: performance.now() }), 1000);
+      } else if (m.t === "pong") {
+        const ms = Math.round(performance.now() - m.ts);
+        setStatus("ok", "Connected, " + ms + " ms"); send({ t: "lat", ms });
+      }
+    };
+    ws.onclose = () => {
+      clearInterval(pingTimer); resetControls(); deck.classList.add("off");
+      setStatus("down", "Disconnected"); reconnectTimer = setTimeout(connect, 1000);
+    };
+    ws.onerror = () => ws.close();
+  }
+
+  /* ---------- Settings (saved on the phone) ---------- */
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+  let lockDeg = store.get("lockDeg", 45), flipped = store.get("flipped", false);
+  $("lock").value = lockDeg; $("lockVal").textContent = lockDeg + "°";
+  $("lock").addEventListener("input", (e) => { lockDeg = +e.target.value; $("lockVal").textContent = lockDeg + "°"; store.set("lockDeg", lockDeg); });
+  $("flip").addEventListener("click", () => { flipped = !flipped; store.set("flipped", flipped); });
+  let dzComp = store.get("dzComp", 24);
+  $("dz").value = dzComp; $("dzVal").textContent = dzComp + "%";
+  $("dz").addEventListener("input", (e) => { dzComp = +e.target.value; $("dzVal").textContent = dzComp + "%"; store.set("dzComp", dzComp); });
+
+  /* ---------- Tilt steering (phone held like a wheel) ---------- */
+  const DEADZONE = 2, SMOOTH = 0.35;
+  let rawAngle = 0, offset = 0, ang = 0, lastSent = 0;
+  const wrap = (x) => ((x + 540) % 360) - 180;
+
+  window.addEventListener("devicemotion", (e) => {
+    const g = e.accelerationIncludingGravity;
+    if (!g || g.x == null) return;
+    rawAngle = Math.atan2(g.y, g.x) * 180 / Math.PI;       // roll of the phone
+    ang += (wrap(rawAngle - offset) - ang) * SMOOTH;        // smoothed angle from calibrated center
+    let a = Math.abs(ang) < DEADZONE ? 0 : Math.sign(ang) * (Math.abs(ang) - DEADZONE);
+    const shown = Math.max(-1, Math.min(1, a / lockDeg)) * (flipped ? -1 : 1);
+    // Games ignore the first ~24% of a stick's travel; jump past it so small tilts register.
+    const v = shown === 0 ? 0 : Math.sign(shown) * (dzComp / 100 + (1 - dzComp / 100) * Math.abs(shown));
+    $("value").textContent = Math.round(shown * 100);
+    $("mark").style.left = (50 + shown * 50) + "%";
+    if (Math.abs(v - lastSent) > 0.003) { lastSent = v; send({ t: "steer", v }); }
+  });
+  function calibrate() { offset = rawAngle; ang = 0; }
+  $("calib").addEventListener("click", calibrate);
+
+  /* ---------- Pedals ---------- */
+  const pedals = {
+    throttle: { value: 0, target: 0, up: 2.5, down: 6, el: $("throttle") },
+    brake:    { value: 0, target: 0, up: 4,   down: 8, el: $("brake") },
+  };
+  for (const p of Object.values(pedals)) {
+    p.fill = p.el.querySelector(".fill");
+    p.el.addEventListener("pointerdown", (e) => { p.el.setPointerCapture(e.pointerId); p.target = 1; });
+    const rel = () => { p.target = 0; };
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((n) => p.el.addEventListener(n, rel));
+    p.el.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
+  let lastT = performance.now();
+  function loop(now) {
+    const dt = Math.min((now - lastT) / 1000, 0.1); lastT = now;
+    for (const [name, p] of Object.entries(pedals)) {
+      const step = (p.target > p.value ? p.up : p.down) * dt;
+      const nv = p.value < p.target ? Math.min(p.target, p.value + step) : Math.max(p.target, p.value - step);
+      if (nv !== p.value) { p.value = nv; p.fill.style.transform = "scaleY(" + nv + ")"; send({ t: name, v: nv }); }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function resetControls() {
+    for (const p of Object.values(pedals)) { p.target = 0; p.value = 0; p.fill.style.transform = "scaleY(0)"; }
+    lastSent = 0; $("value").textContent = "0"; $("mark").style.left = "50%";
+  }
+  function releaseAndTell() {
+    resetControls(); send({ t: "throttle", v: 0 }); send({ t: "brake", v: 0 }); send({ t: "steer", v: 0 });
+  }
+
+  /* ---------- Fullscreen, landscape lock, screen awake ---------- */
+  async function keepAwake() { try { await navigator.wakeLock.request("screen"); } catch (e) {} }
+  $("startBtn").addEventListener("click", async () => {
+    try { await document.documentElement.requestFullscreen({ navigationUI: "hide" }); } catch (e) {}
+    try { await screen.orientation.lock("landscape"); } catch (e) {}
+    keepAwake();
+    $("start").style.display = "none";
+    setTimeout(calibrate, 400);   // current holding angle becomes "straight"
+  });
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) { $("start").style.display = "flex"; releaseAndTell(); }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") keepAwake(); else releaseAndTell();
+  });
+
+  connect();
+</script>
+</body>
+</html>

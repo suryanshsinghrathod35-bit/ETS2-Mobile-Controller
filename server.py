@@ -55,7 +55,7 @@ KEYMAP = {
     "engine":   ("e",     "tap"),
     "cruise":   ("c",     "tap"),
     "trailer":  ("t",     "tap"),
-    "enter":    ("enter", "tap"),
+    "enter":    ("enter", "hold"),
     "pause":    ("esc",   "tap"),
 }
 held_keys = set()  # keys currently held down by "hold" buttons

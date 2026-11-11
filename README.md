@@ -56,6 +56,8 @@ Then run `ViGEmBus_1.22.0_x64_x86_arm64.exe` to install the virtual gamepad driv
    python server.py
    ```
    To force a specific IP (for example a phone hotspot): `python server.py 192.168.1.5`
+
+   Or just double-click **`start-server.bat`**: it asks for Administrator permission, opens the project folder, activates the venv and starts the server.
 3. On the first run, Windows Firewall asks for access. Tick **Private networks**.
 4. Scan the QR code shown in the terminal with your phone.
 5. Chrome shows a certificate warning (expected, the certificate is self-signed). Tap **Advanced > Proceed**.
@@ -130,6 +132,7 @@ server.py            HTTPS + WebSocket server, virtual gamepad, key presses
 static/index.html    the phone page (UI, tilt steering, pedals, buttons)
 test_pad.py          small virtual-gamepad test
 requirements.txt     Python packages
+start-server.bat     double-click launcher (runs as Administrator)
 HANDOFF.md           developer notes and next steps
 ```
 
@@ -140,7 +143,6 @@ HANDOFF.md           developer notes and next steps
 - Customisable quick-button row
 - Vibration feedback on press
 - PIN/token for the connection
-- Double-click launcher that starts the server as Administrator
 
 ## Credits
 
